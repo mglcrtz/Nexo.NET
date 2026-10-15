@@ -1,8 +1,9 @@
-using System.Drawing.Text;
-using System.Net;
-using System.Text.RegularExpressions;
+﻿using System.Drawing.Text;
 using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 
 namespace Nexo.NET
@@ -19,12 +20,18 @@ namespace Nexo.NET
         // ===============================
         private readonly ChatClient _chatClient;
 
+        // PMs 
+        private readonly Dictionary<string, PmForm> _pmWindows =
+            new(StringComparer.OrdinalIgnoreCase);
+
         public SalaChat(ChatClient chatClient)
         {
             InitializeComponent();
             lstUsers.DrawMode = DrawMode.OwnerDrawFixed;
             lstUsers.ItemHeight = 24;
             lstUsers.DrawItem += lstUsers_DrawItem;
+            lstUsers.DoubleClick -= lstUsers_DoubleClick;
+            lstUsers.DoubleClick += lstUsers_DoubleClick;
 
             AcceptButton = btnSend;
 
@@ -33,6 +40,8 @@ namespace Nexo.NET
 
 
             _chatClient = chatClient;
+
+            _chatClient.PrivateMessageReceived += ChatClient_PrivateMessageReceived;
 
             _chatClient.RoomJoined += room =>
             {
@@ -81,6 +90,8 @@ namespace Nexo.NET
             };
             // End live message handling
 
+
+
             _chatClient.UserListUpdated += users =>
             {
                 BeginInvoke(async () =>
@@ -96,6 +107,9 @@ namespace Nexo.NET
                     lstUsers.Invalidate();
                 });
             };
+       
+
+            FormClosed += SalaChat_FormClosed;
         }
 
         private async Task AppendChatMessageAsync(ChatMessage msg)
@@ -803,5 +817,104 @@ namespace Nexo.NET
         {
 
         }
+
+        private void ChatClient_PrivateMessageReceived(
+            PrivateMessage message)
+        {
+            if (IsDisposed || Disposing || !IsHandleCreated)
+                return;
+
+            void HandleMessage()
+            {
+                var sender = (message.from ?? "").Trim();
+
+                if (string.IsNullOrWhiteSpace(sender))
+                    return;
+
+                var pm = OpenPmWindow(sender);
+                pm?.ReceiveMessage(message);
+            }
+
+            if (InvokeRequired)
+                BeginInvoke(HandleMessage);
+            else
+                HandleMessage();
+        }
+
+        private void SalaChat_FormClosed(
+            object? sender,
+            FormClosedEventArgs e)
+        {
+            _chatClient.PrivateMessageReceived -=
+                ChatClient_PrivateMessageReceived;
+        }
+
+        // Open PM window on double-click
+        private void lstUsers_DoubleClick(
+    object? sender,
+    EventArgs e)
+        {
+            if (lstUsers.SelectedItem is not UserListItem user)
+                return;
+
+            if (string.Equals(
+                user.username,
+                _chatClient.CurrentUsername,
+                StringComparison.OrdinalIgnoreCase))
+                return;
+
+            OpenPmWindow(user.username);
+        }
+
+        private PmForm? OpenPmWindow(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return null;
+
+            username = username.Trim();
+
+            if (string.Equals(
+                username,
+                _chatClient.CurrentUsername,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            if (_pmWindows.TryGetValue(
+                username,
+                out var existing))
+            {
+                if (!existing.IsDisposed)
+                {
+                    if (!existing.Visible)
+                        existing.Show(this);
+
+                    existing.BringToFront();
+                    existing.Activate();
+
+                    return existing;
+                }
+
+                _pmWindows.Remove(username);
+            }
+
+            var pm = new PmForm(
+                _chatClient,
+                username
+            );
+
+            _pmWindows[username] = pm;
+
+            pm.FormClosed += (_, _) =>
+            {
+                _pmWindows.Remove(username);
+            };
+
+            pm.Show(this);
+
+            return pm;
+        }
+
     }
 }

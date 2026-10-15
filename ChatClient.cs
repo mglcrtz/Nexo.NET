@@ -28,6 +28,9 @@ namespace Nexo.NET
         public event Action<string>? LoginFailed;
         public event Action<string>? RoomJoined;
 
+        //Private message events
+        public event Action<PrivateMessage>? PrivateMessageReceived;
+
         // User list events
         public event Action<List<UserListItem>>? UserListUpdated;
 
@@ -204,6 +207,75 @@ namespace Nexo.NET
 
         // End send public chat message        
 
+        // Send private message
+        public async Task<bool> SendPrivateMessageAsync(
+            string recipient,
+            string message)
+        {
+            if (_socket == null || !_socket.Connected)
+                return false;
+
+            recipient = recipient.Trim();
+            message = message.Trim();
+
+            if (string.IsNullOrWhiteSpace(recipient) ||
+                string.IsNullOrWhiteSpace(message))
+            {
+                return false;
+            }
+
+            if (string.Equals(
+                recipient,
+                _username,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var payload = new
+            {
+                room = _room,
+                from = _username,
+                to = recipient,
+                username = _username,
+                message = message,
+                format = new
+                {
+                    bold = false,
+                    italic = false,
+                    underline = false,
+                    fontFamily = "Arial",
+                    color = "#000000"
+                },
+                vipNickColor = (string?)null,
+                _acceptedLink = false
+            };
+
+            try
+            {
+                await _socket.EmitAsync(
+                    "private_message",
+                    new object[]
+                    {
+                        payload
+                    }
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ConnectionError?.Invoke(
+                    "Error enviando private_message: " +
+                    ex.Message
+                );
+
+                return false;
+            }
+        }
+
+        // End send private message
+
         private void RegisterEvents()
         {
             if (_socket == null)
@@ -323,6 +395,32 @@ namespace Nexo.NET
                     return Task.CompletedTask;
                 }
             });
+
+            //Private message handling
+            _socket.On("private_message", response =>
+            {
+                try
+                {
+                    var data =
+                        response.GetValue<PrivateMessage>(0);
+
+                    if (data == null)
+                        return Task.CompletedTask;
+
+                    PrivateMessageReceived?.Invoke(data);
+                }
+                catch (Exception ex)
+                {
+                    ConnectionError?.Invoke(
+                        "Error procesando private_message: " +
+                        ex.Message
+                    );
+                }
+
+                return Task.CompletedTask;
+            });
+            //Ends private message handling
+
         }
 
         private async Task CheckNickAsync()
@@ -495,4 +593,21 @@ namespace Nexo.NET
         public string color { get; set; } = "#000000";
     }
 
+    // Private message models
+    public class PrivateMessage
+    {
+        public string room { get; set; } = "";
+        public string from { get; set; } = "";
+        public string to { get; set; } = "";
+        public string username { get; set; } = "";
+        public string message { get; set; } = "";
+
+        public ChatFormat format { get; set; } = new();
+
+        public string? vipNickColor { get; set; }
+
+        public bool _acceptedLink { get; set; }
+    }
+
 }
+    
