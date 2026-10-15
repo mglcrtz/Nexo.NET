@@ -107,7 +107,7 @@ namespace Nexo.NET
                     lstUsers.Invalidate();
                 });
             };
-       
+
 
             FormClosed += SalaChat_FormClosed;
         }
@@ -916,5 +916,9 @@ namespace Nexo.NET
             return pm;
         }
 
+        private void txtMessage_TextChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }

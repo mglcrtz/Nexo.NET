@@ -71,7 +71,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(374, 236);
+            ClientSize = new Size(377, 236);
             Controls.Add(btnPmBuzz);
             Controls.Add(btnPmSend);
             Controls.Add(txtPmMessage);

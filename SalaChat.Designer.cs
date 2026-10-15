@@ -63,7 +63,7 @@
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(348, 23);
             txtMessage.TabIndex = 2;
-            txtMessage.Text = "Mensaje";
+            txtMessage.TextChanged += txtMessage_TextChanged;
             // 
             // btnSend
             // 
