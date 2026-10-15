@@ -1,6 +1,5 @@
 ﻿using SocketIOClient;
 using SocketIOClient.Common;
-using System.Text.Json;
 
 namespace Nexo.NET
 {
@@ -16,8 +15,12 @@ namespace Nexo.NET
 
         public bool IsConnected =>
             _socket != null && _socket.Connected;
-        
-        // Conection events
+
+        // Current connection state exposed to the UI
+        public string CurrentUsername => _username;
+        public string CurrentRoom => _room;
+
+        // Connection events
         public event Action? Connected;
         public event Action<string>? ConnectionError;
         public event Action? Disconnected;
@@ -25,13 +28,12 @@ namespace Nexo.NET
         public event Action<string>? LoginFailed;
         public event Action<string>? RoomJoined;
 
-        //User list events
-        public event Action<List<string>>? UserListUpdated;
-        
-        //Message events
+        // User list events
+        public event Action<List<UserListItem>>? UserListUpdated;
+
+        // Message events
         public event Action<ChatMessage>? MessageReceived;
         public event Action<List<ChatMessage>>? HistoryReceived;
-
 
         public async Task ConnectAsync(
             string username,
@@ -39,7 +41,28 @@ namespace Nexo.NET
             string room)
         {
             try
+
             {
+
+                if (_socket != null)
+                {
+                    try
+                    {
+                        if (_socket.Connected)
+                            await _socket.DisconnectAsync();
+
+                        _socket.Dispose();
+                    }
+                    catch
+                    {
+                    }
+
+                    _socket = null;
+                }
+
+                _authToken = "";
+                _clientId = "";
+
                 _username = username;
                 _password = password;
                 _room = room.ToLowerInvariant();
@@ -83,7 +106,7 @@ namespace Nexo.NET
                     ConnectionError?.Invoke(error);
                 };
 
-                // Historial de Mensajes de Chat (recibidos al unirse a la sala)
+                // Room history received after joining
                 _socket.On("room_history", response =>
                 {
                     try
@@ -107,7 +130,7 @@ namespace Nexo.NET
                     }
                 });
 
-                // Procesador de mensajes recibidos
+                // Live messages received from server
                 _socket.On("message", response =>
                 {
                     try
@@ -130,8 +153,7 @@ namespace Nexo.NET
                         return Task.CompletedTask;
                     }
                 });
-                //Message Ends  
-
+                // End live message handling  
 
                 await _socket.ConnectAsync();
             }
@@ -141,13 +163,14 @@ namespace Nexo.NET
             }
         }
 
-        // Procesador de formato mensajes enviados
+        // Send public chat message
         public async Task SendMessageAsync(
             string message,
             bool bold,
             bool italic,
             bool underline,
-            string fontFamily)
+            string fontFamily,
+            string messageColor)
         {
             if (_socket == null || !_socket.Connected)
                 return;
@@ -162,8 +185,10 @@ namespace Nexo.NET
                     bold,
                     italic,
                     underline,
-                    fontFamily
+                    fontFamily,
+                    color = messageColor
                 },
+
                 vipNickColor = (string?)null,
                 timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
@@ -172,13 +197,12 @@ namespace Nexo.NET
                 "message",
                 new object[]
                 {
-            payload
+                    payload
                 }
             );
         }
 
-            // Procesador de mensajes enviados Fin        
-      
+        // End send public chat message        
 
         private void RegisterEvents()
         {
@@ -200,12 +224,12 @@ namespace Nexo.NET
 
                     if (data.registered)
                     {
-                        //Registered Nickname -> password login first
+                        // Registered nickname -> password login first
                         await LoginAsync();
                     }
                     else
                     {
-                        // Guest nickname ->no ppassword/auth token needed, join room directly
+                        // Guest nickname -> no password/auth token needed; join room directly
                         _authToken = "";
                         await JoinRoomAsync();
                     }
@@ -259,12 +283,11 @@ namespace Nexo.NET
                     if (data?.users == null)
                         return Task.CompletedTask;
 
-                    var names = data.users
-                        .Select(u => u.username)
-                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                    var users = data.users
+                        .Where(u => !string.IsNullOrWhiteSpace(u.username))
                         .ToList();
 
-                    UserListUpdated?.Invoke(names);
+                    UserListUpdated?.Invoke(users);
 
                     return Task.CompletedTask;
                 }
@@ -277,7 +300,6 @@ namespace Nexo.NET
                     return Task.CompletedTask;
                 }
             });
-
 
             _socket.On("join_room_ok", response =>
             {
@@ -302,7 +324,7 @@ namespace Nexo.NET
                 }
             });
         }
-       
+
         private async Task CheckNickAsync()
         {
             if (_socket == null)
@@ -365,8 +387,20 @@ namespace Nexo.NET
         {
             if (_socket != null)
             {
-                await _socket.DisconnectAsync();
+                try
+                {
+                    if (_socket.Connected)
+                        await _socket.DisconnectAsync();
+                }
+                finally
+                {
+                    _socket.Dispose();
+                    _socket = null;
+                }
             }
+
+            _authToken = "";
+            _clientId = "";
         }
     }
 
@@ -393,6 +427,43 @@ namespace Nexo.NET
     public class UserListItem
     {
         public string username { get; set; } = "";
+
+        public bool isAdmin { get; set; }
+
+        public string? estado { get; set; }
+
+        public string? role { get; set; }
+
+        public string? nickIcon { get; set; }
+
+        public string? nickColor { get; set; }
+
+        public int? vipLevel { get; set; }
+
+        public string? vipNickColor { get; set; }
+
+        public string? vipIcon { get; set; }
+
+        public string? staffPaintColor { get; set; }
+
+        public string? staffIcon { get; set; }
+
+        public bool isGuardian { get; set; }
+
+        public bool guardianOnHold { get; set; }
+
+        public bool isFrozen { get; set; }
+
+        public bool isMuted { get; set; }
+
+        public bool hidden { get; set; }
+
+        public object? onlineSince { get; set; }
+
+        public override string ToString()
+        {
+            return username;
+        }
     }
 
     public class UserListResponse
@@ -400,8 +471,8 @@ namespace Nexo.NET
         public List<UserListItem> users { get; set; } = new();
     }
 
-    //Cadena de mensajes Enviados y recibidos del servidor
-    public class ChatMessage 
+    // Chat message models
+    public class ChatMessage
     {
         public string id { get; set; } = "";
         public string username { get; set; } = "";
@@ -410,18 +481,18 @@ namespace Nexo.NET
         public string? vipNickColor { get; set; }
         public long timestamp { get; set; }
     }
-    public class RoomHistoryResponse //Historial de mensajes recibidos al unirse a la sala
+    public class RoomHistoryResponse // Room history received when joining
     {
         public List<ChatMessage> messages { get; set; } = new();
     }
 
-    public class ChatFormat //Formato de mensajes enviados y recibidos del servidor
+    public class ChatFormat // Message formatting sent/received by server
     {
         public bool bold { get; set; }
         public bool italic { get; set; }
         public bool underline { get; set; }
         public string fontFamily { get; set; } = "Verdana";
+        public string color { get; set; } = "#000000";
     }
-
 
 }

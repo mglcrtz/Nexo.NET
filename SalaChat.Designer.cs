@@ -55,6 +55,7 @@
             lstUsers.Name = "lstUsers";
             lstUsers.Size = new Size(196, 514);
             lstUsers.TabIndex = 1;
+            lstUsers.SelectedIndexChanged += lstUsers_SelectedIndexChanged;
             // 
             // txtMessage
             // 
@@ -91,6 +92,7 @@
             btnBold.TabIndex = 5;
             btnBold.Text = "N";
             btnBold.UseVisualStyleBackColor = true;
+            btnBold.Click += btnBold_Click;
             // 
             // btnItalic
             // 
@@ -101,6 +103,7 @@
             btnItalic.TabIndex = 6;
             btnItalic.Text = "I";
             btnItalic.UseVisualStyleBackColor = true;
+            btnItalic.Click += btnItalic_Click;
             // 
             // btnUnderline
             // 
@@ -111,6 +114,7 @@
             btnUnderline.TabIndex = 7;
             btnUnderline.Text = "S";
             btnUnderline.UseVisualStyleBackColor = true;
+            btnUnderline.Click += btnUnderline_Click;
             // 
             // btnColors
             // 
@@ -121,6 +125,7 @@
             btnColors.TabIndex = 9;
             btnColors.Text = "A";
             btnColors.UseVisualStyleBackColor = true;
+            btnColors.Click += btnColors_Click;
             // 
             // btnConexión
             // 

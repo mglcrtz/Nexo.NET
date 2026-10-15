@@ -90,8 +90,7 @@
 
         private void Conexion_FormClosed(object? sender, FormClosedEventArgs e)
         {
-            // VERY IMPORTANT:
-            // remove this form from the shared ChatClient events
+            // Unsubscribe this form from the shared ChatClient
             _chatClient.ConnectionError -= ChatClient_ConnectionError;
             _chatClient.Disconnected -= ChatClient_Disconnected;
             _chatClient.NickStatusReceived -= ChatClient_NickStatusReceived;
